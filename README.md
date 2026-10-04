@@ -1,4 +1,4 @@
-# Tower Vision Detection — ROS 2 Humble + YOLOv8 + TensorRT on NVIDIA Jetson
+# YOLOv8 ROS 2 Jetson TensorRT Detector
 
 Jetson-optimized ROS 2 vision detector for **power-line tower head and body detection** from a live camera stream. The repository contains both deployment forms of the project:
 
@@ -37,7 +37,7 @@ The detector is built around YOLOv8 and is optimized for NVIDIA Jetson Orin NX 1
 ## Repository layout
 
 ```text
-tower-vision-yolov8-ros2-jetson/
+yolov8-ros2-jetson-tensorrt-detector/
 ├── README.md
 ├── .gitignore
 ├── standalone/
@@ -253,8 +253,8 @@ and uses NVIDIA AArch64 PyTorch/torchvision wheels matching that environment. If
 ## Clone the repository
 
 ```bash
-git clone https://github.com/nimahmoodi1/tower-vision-yolov8-ros2-jetson.git
-cd tower-vision-yolov8-ros2-jetson
+git clone https://github.com/nimahmoodi1/yolov8-ros2-jetson-tensorrt-detector.git
+cd yolov8-ros2-jetson-tensorrt-detector
 ```
 
 ---
