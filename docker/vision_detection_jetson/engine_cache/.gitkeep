@@ -1,0 +1,2 @@
+# TensorRT engines are built here on first launch and reused afterwards.
+# They are device-, TensorRT- and JetPack-specific: never commit them.

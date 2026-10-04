@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""Console entry point for the vision_feedback detection node."""
+from vision_perception.node import main
+
+if __name__ == "__main__":
+    main()

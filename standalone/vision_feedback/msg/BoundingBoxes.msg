@@ -1,0 +1,10 @@
+bool has_head
+int32 head_x1
+int32 head_y1
+int32 head_x2
+int32 head_y2
+bool has_body
+int32 body_x1
+int32 body_y1
+int32 body_x2
+int32 body_y2

@@ -1,0 +1,106 @@
+services:
+  vision_detection_jetson:
+    container_name: vision_detection_jetson
+    image: vision_detection_jetson:latest
+    platform: linux/arm64
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+      network: host
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-nvcr.io/nvidia/l4t-jetpack:r36.3.0}
+        HOST_UID: ${HOST_UID:-1000}
+        HOST_GID: ${HOST_GID:-1000}
+        TORCH_WHEEL_URL: ${TORCH_WHEEL_URL:-https://nvidia.box.com/shared/static/mp164asf3sceb570wvjsrezk1p4ftj8t.whl}
+        TORCHVISION_WHEEL_URL: ${TORCHVISION_WHEEL_URL:-https://nvidia.box.com/shared/static/xpr06qe6ql3l6rj22cu3c45tz1wzi36p.whl}
+
+    # Same NVIDIA-runtime pattern that works for lr1_camera on this Jetson.
+    runtime: nvidia
+    network_mode: host
+    ipc: host
+
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    group_add:
+      - video
+
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+
+      AUTOSTART: "${AUTOSTART:-1}"
+      # Build the TensorRT engine during startup instead of during the first
+      # camera frame. Set to 0 to skip (the node still builds it on demand).
+      PREBUILD_ENGINE: "${PREBUILD_ENGINE:-1}"
+
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_LOCALHOST_ONLY: "${ROS_LOCALHOST_ONLY:-0}"
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      FASTRTPS_DEFAULT_PROFILES_FILE: /ws_vision_detection/config/fastdds_profile.xml
+      RCUTILS_COLORIZED_OUTPUT: "1"
+      RCUTILS_LOGGING_BUFFERED_STREAM: "0"
+
+      HOME: /home/vision_detection
+      ROS_HOME: /home/vision_detection/.ros
+      ROS_LOG_DIR: /home/vision_detection/.ros/log
+      YOLO_CONFIG_DIR: /tmp/Ultralytics
+      YOLO_OFFLINE: "1"
+      MPLCONFIGDIR: /tmp/matplotlib
+
+      # Keep torch/OpenBLAS/OpenCV off the cores the flight stack needs.
+      # Inference itself runs on the GPU.
+      OMP_NUM_THREADS: "${OMP_NUM_THREADS:-1}"
+      OPENBLAS_NUM_THREADS: "${OPENBLAS_NUM_THREADS:-1}"
+      MKL_NUM_THREADS: "${MKL_NUM_THREADS:-1}"
+      NUMEXPR_NUM_THREADS: "${NUMEXPR_NUM_THREADS:-1}"
+      CUDA_MODULE_LOADING: LAZY
+
+      ENGINE_CACHE_DIR: /engine_cache
+
+      # Used by the default command and by Makefile targets.
+      VISION_BACKEND: "${VISION_BACKEND:-tensorrt}"
+      VISION_DEVICE: "${VISION_DEVICE:-cuda:0}"
+      VISION_PRECISION: "${VISION_PRECISION:-fp16}"
+      VISION_INPUT_SHAPE: "${VISION_INPUT_SHAPE:-auto}"
+      VISION_FP16_IO: "${VISION_FP16_IO:-false}"
+      IMAGE_TOPIC: "${IMAGE_TOPIC:-/camera/out/live_view}"
+      SHOW_DISPLAY: "${SHOW_DISPLAY:-true}"
+      BBOX_TOPIC: "${BBOX_TOPIC:-/art/bounding_boxes}"
+      RAW_BBOX_TOPIC: "${RAW_BBOX_TOPIC:-/art/bounding_boxes_raw}"
+
+      # X11 for SHOW_DISPLAY=true. This Jetson serves its desktop on :10 (xrdp),
+      # so :10 is the default here rather than :0.
+      DISPLAY: "${DISPLAY:-:10}"
+      XAUTHORITY: "${XAUTHORITY:-/tmp/.docker.xauth}"
+      QT_X11_NO_MITSHM: "1"
+
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XAUTHORITY:-/tmp/.docker.xauth}:${XAUTHORITY:-/tmp/.docker.xauth}:rw
+      # TensorRT engines are device-specific and take minutes to build. Keeping
+      # them on the host means container recreation stays instant.
+      - ./engine_cache:/engine_cache:rw
+
+    command:
+      - ros2
+      - launch
+      - vision_feedback
+      - vision.launch.py
+      - backend:=${VISION_BACKEND:-tensorrt}
+      - device:=${VISION_DEVICE:-cuda:0}
+      - inference_precision:=${VISION_PRECISION:-fp16}
+      - inference_input_shape:=${VISION_INPUT_SHAPE:-auto}
+      - trt_fp16_io:=${VISION_FP16_IO:-false}
+      - image_topic:=${IMAGE_TOPIC:-/camera/out/live_view}
+      - bbox_topic:=${BBOX_TOPIC:-/art/bounding_boxes}
+      - raw_bbox_topic:=${RAW_BBOX_TOPIC:-/art/bounding_boxes_raw}
+      - show_display:=${SHOW_DISPLAY:-true}
+
+    restart: unless-stopped
+    stop_grace_period: 10s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"

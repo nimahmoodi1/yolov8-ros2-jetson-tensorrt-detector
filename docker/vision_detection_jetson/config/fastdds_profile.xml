@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Fast DDS tuning for large image messages.
+
+  A 1280x720 bgr8 frame is 2.76 MB and a 1024x768 frame is 2.36 MB. At 30 Hz
+  that is 60-80 MB/s. With the stock Fast DDS socket buffers a subscriber will
+  drop most fragments and `ros2 topic hz` shows a few Hz instead of 30.
+
+  This profile enlarges the UDP buffers and the shared-memory segment, and
+  keeps both transports so that subscribers using the default configuration
+  can still discover and receive.
+
+  On the host also raise the kernel limits, otherwise the requested socket
+  buffer is silently clamped:
+      sudo sysctl -w net.core.rmem_max=16777216
+      sudo sysctl -w net.core.wmem_max=16777216
+-->
+<dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <profiles>
+
+    <transport_descriptors>
+
+      <transport_descriptor>
+        <transport_id>shm_large</transport_id>
+        <type>SHM</type>
+        <segment_size>67108864</segment_size>
+      </transport_descriptor>
+
+      <transport_descriptor>
+        <transport_id>udp_large</transport_id>
+        <type>UDPv4</type>
+        <sendBufferSize>16777216</sendBufferSize>
+        <receiveBufferSize>16777216</receiveBufferSize>
+        <maxMessageSize>65000</maxMessageSize>
+      </transport_descriptor>
+
+    </transport_descriptors>
+
+    <!--
+      Default DataWriter settings for every publisher in this process.
+
+      ASYNCHRONOUS publish mode matters here: a 2.76 MB image is fragmented
+      into many UDP datagrams, and in SYNCHRONOUS mode write() does that work
+      on the calling thread. Asynchronous hands it to a Fast DDS sending
+      thread so write() returns immediately.
+
+      ROS QoS (reliability, history, depth) is layered on top of this profile,
+      so the node's own qos_reliability parameter still wins.
+    -->
+    <data_writer profile_name="live_view_writer" is_default_profile="true">
+      <qos>
+        <publishMode>
+          <kind>ASYNCHRONOUS</kind>
+        </publishMode>
+      </qos>
+      <historyMemoryPolicy>PREALLOCATED_WITH_REALLOC</historyMemoryPolicy>
+    </data_writer>
+
+    <data_reader profile_name="live_view_reader" is_default_profile="true">
+      <historyMemoryPolicy>PREALLOCATED_WITH_REALLOC</historyMemoryPolicy>
+    </data_reader>
+
+    <participant profile_name="live_view_participant" is_default_profile="true">
+      <rtps>
+        <userTransports>
+          <transport_id>shm_large</transport_id>
+          <transport_id>udp_large</transport_id>
+        </userTransports>
+        <useBuiltinTransports>false</useBuiltinTransports>
+      </rtps>
+    </participant>
+
+  </profiles>
+</dds>

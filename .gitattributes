@@ -1,0 +1,14 @@
+# Keep repository text files Linux/Unix compatible.
+* text=auto eol=lf
+
+# Binary files - never perform line-ending conversion.
+*.pt binary
+*.pth binary
+*.onnx binary
+*.engine binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.zip binary

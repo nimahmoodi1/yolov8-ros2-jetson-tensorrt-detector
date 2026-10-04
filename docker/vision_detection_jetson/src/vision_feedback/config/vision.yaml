@@ -1,0 +1,180 @@
+# =============================================================================
+# vision_feedback / vision_node configuration
+# -----------------------------------------------------------------------------
+# Tuned for NVIDIA Jetson Orin NX 16 GB, JetPack 6.0 (L4T R36.3, TensorRT 8.6).
+#
+# Shared scalars (vertical_fov_deg, distance_to_target_m, camera size,
+# live_distance_topic, model) are overridden from mission.yaml when
+# use_mission_config: true.
+# =============================================================================
+vision_node:
+  ros__parameters:
+
+    use_mission_config: true
+
+    # Live standoff for pixel->meter gates (merge, temporal filter).
+    # Uses /dist_to_struct when fresh; otherwise falls back to mission inspection.radius.
+    use_live_distance: true
+    live_distance_topic: /dist_to_struct
+    live_distance_stale_s: 0.6
+
+    # The mission profile overrides this during normal launch.
+    # Standalone use: simulation=/camera/gimbal/image; real=/camera/out/live_view.
+    image_topic: /camera/out/live_view
+    bbox_topic: /art/bounding_boxes
+    raw_bbox_topic: /art/bounding_boxes_raw
+
+    # mission.yaml profiles select the deployed model; empty uses the packaged fallback.
+    model_path: ""
+    device: auto
+
+    # ------------------------------------------------------------------ #
+    # INFERENCE BACKEND
+    # ------------------------------------------------------------------ #
+    # tensorrt : native TensorRT engine, GPU pre/post-processing  (fastest)
+    # torch    : Ultralytics PyTorch                              (fallback)
+    # auto     : tensorrt when CUDA + the TensorRT bindings exist, else torch
+    backend: auto
+
+    # fp16 halves GPU time on Orin's tensor cores. For detection the mAP change
+    # is within run-to-run noise; keep fp32 only when validating a new model.
+    inference_precision: fp16
+
+    # Network input shape.
+    #   auto   -> derived from expected_frame_* so the long side is
+    #             inference_imgsz and the short side is only padded to the next
+    #             multiple of 32. 1280x720 -> 384x640.
+    #   square -> inference_imgsz x inference_imgsz (classic YOLO letterbox)
+    #   HxW    -> explicit, e.g. "576x960" for extra reach at long standoff
+    #
+    # 'auto' carries exactly the same image detail as 'square' at the same
+    # inference_imgsz: the removed pixels are grey padding, not scene content.
+    inference_input_shape: auto
+
+    # Engines are GPU/TensorRT/JetPack specific and cannot be shipped in the
+    # image, so they are built once on this device and cached here.
+    engine_cache_dir: /engine_cache
+    auto_build_engine: true
+    trt_workspace_mib: 2048
+    onnx_opset: 16
+
+    # Force the engine's *input and output tensors* to FP16 as well.
+    #
+    # With inference_precision: fp16, TensorRT already runs the layers in FP16
+    # but keeps the network boundary in FP32 and inserts two cast nodes. That
+    # is why /diagnostics reports the engine I/O dtype separately from the
+    # built precision. Setting this true removes both casts (a few percent)
+    # at the cost of ~0.5 px quantisation on the emitted box coordinates.
+    # Requires inference_precision: fp16. Changing it rebuilds the engine.
+    trt_fp16_io: false
+
+    warmup_frames: 3
+
+    # ------------------------------------------------------------------ #
+    # DETECTION
+    # ------------------------------------------------------------------ #
+    # The deployed YOLOv8n checkpoints were all trained at imgsz=640; running
+    # inference at the training resolution is both the cheapest and the most
+    # accurate operating point. See OPTIMIZATION_REPORT.md.
+    inference_imgsz: 640
+    inference_iou_threshold: 0.50
+    inference_max_detections: 20
+
+    # Hard ceiling on detector invocations per second, applied before any
+    # per-frame work. The cap is phase tolerant: a frame arriving within half
+    # an inter-arrival interval of its deadline still counts, so a 30 Hz camera
+    # settles near 20 Hz rather than aliasing down to 15. 0 disables the cap
+    # entirely and lets the node run at whatever rate inference sustains.
+    max_inference_fps: 20.0
+
+    # Class-specific acceptance thresholds. False-positive suppression also
+    # requires the measured geometry and temporal confirmation below.
+    # These also become the detector's NMS confidence floor, since nothing
+    # weaker can ever reach an output.
+    head_confidence_threshold: 0.78
+    body_confidence_threshold: 0.82
+
+    # Real-test head boxes were near-square. These deliberately include margin
+    # around the bag distribution while rejecting poles, people and broad
+    # background regions commonly mislabeled as a tower head/body.
+    head_min_aspect_ratio: 0.60
+    head_max_aspect_ratio: 1.50
+    head_min_area_fraction: 0.0025
+    head_max_area_fraction: 0.12
+    body_min_aspect_ratio: 0.22
+    body_max_aspect_ratio: 0.90
+    body_min_area_fraction: 0.004
+    body_max_area_fraction: 0.30
+
+    # ------------------------------------------------------------------ #
+    # CAMERA GEOMETRY  (pixel <-> meter gates)
+    # ------------------------------------------------------------------ #
+    # Expected input dimensions. mission.yaml overrides these for the active
+    # profile; received frames remain authoritative if a driver changes mode.
+    # These also drive the 'auto' network input shape:
+    #   1280x720  -> 384x640     1024x680 -> 448x640
+    #   1920x1080 -> 384x640      640x480 -> 480x640
+    # Detection works at any incoming resolution regardless of what is set
+    # here - the letterbox adapts - but matching them keeps the engine shape
+    # optimal. Change them, then rebuild: ros2 run vision_feedback build_engine.py
+    expected_frame_width: 1280
+    expected_frame_height: 720
+    # Fallbacks when mission.yaml is unavailable. Must match the simulation profile:
+    #   mission.yaml -> profiles.simulation.camera.vertical_fov_deg
+    #   mission.yaml -> profiles.simulation.inspection.radius
+    vertical_fov_deg: 46.8
+    distance_to_target_m: 7.0
+
+    # ------------------------------------------------------------------ #
+    # HEAD CLUSTERING
+    # ------------------------------------------------------------------ #
+    # At 7 m / 46.8 deg vFOV, full frame height ~= 6.1 m. 1.2 m ~= 142 px at
+    # 720p - merges antenna fragments on one tier without swallowing the tower.
+    merge_center_delta_m: 1.2
+
+    # ------------------------------------------------------------------ #
+    # TEMPORAL FILTER  (head track; uses live standoff + vfov above)
+    # ------------------------------------------------------------------ #
+    # ~1 m max frame-to-frame height/center jump at 7 m standoff.
+    max_jump_m: 1.0
+    # A new track is not published from a single YOLO hit. Allow one missed
+    # processed frame so intermittent real detections can still confirm.
+    acquisition_frames: 3
+    acquisition_max_missed_frames: 1
+    # At the 15 Hz camera rate, six misses are roughly 0.4 s. Drop a lost track
+    # before it can drive several orbit-controller updates with stale geometry.
+    reset_after_n_missed: 6
+
+    # ------------------------------------------------------------------ #
+    # STABILIZER  (head only - body is re-derived from head, no desync)
+    # ------------------------------------------------------------------ #
+    # Keep brief detector dropouts, but do not steer from a box held for >0.4 s.
+    stabilizer_hold_time_s: 0.4
+    # Moderate EMA: suppress frame jitter while retaining a fast response at 15 Hz.
+    stabilizer_alpha: 0.60
+
+    # Stop reusing a truly frozen camera frame quickly. Normal YOLO dropouts are
+    # handled separately by reset_after_n_missed and stabilizer_hold_time_s.
+    duplicate_timeout_s: 0.75
+
+    # ------------------------------------------------------------------ #
+    # RUNTIME / DISPLAY
+    # ------------------------------------------------------------------ #
+    # With inference on the GPU the CPU only letterboxes and publishes. Letting
+    # torch/OpenCV each spawn 8 OpenMP workers just steals cores from the flight
+    # stack. 0 disables the limit and restores library defaults.
+    cpu_threads: 1
+
+    show_display: true
+    # A debug overlay does not need the full camera rate. Surplus frames are
+    # dropped before the resize and the drawing, so this saves producer CPU too.
+    display_max_fps: 10.0
+    # Annotate at this width instead of full resolution; pushing full frames
+    # through X11/xrdp is the expensive part. The resize is skipped when it
+    # would remove less than 15 % of the width, so on a 1024-wide camera set
+    # this to 640 to actually get a saving (960 would be a no-op).
+    display_width: 960
+
+    publish_diagnostics: true
+    # Periodic fps / latency line in the node log. 0 disables it.
+    stats_log_interval_s: 10.0

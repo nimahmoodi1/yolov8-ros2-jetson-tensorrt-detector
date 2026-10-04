@@ -1,0 +1,42 @@
+# Local environment / secrets
+.env
+!.env.example
+*.local
+
+# ROS 2 / colcon output
+build/
+install/
+log/
+**/build/
+**/install/
+**/log/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# TensorRT / ONNX generated artifacts
+*.engine
+*.plan
+*.onnx
+*.partial
+**/engine_cache/*
+!**/engine_cache/.gitkeep
+
+# Runtime logs / bags
+*.log
+*.db3
+*.mcap
+
+# X11 / local Docker auth helpers
+.docker.xauth
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
