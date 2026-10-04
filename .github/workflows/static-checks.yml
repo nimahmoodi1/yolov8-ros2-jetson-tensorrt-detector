@@ -1,0 +1,52 @@
+name: Static checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Python syntax
+        run: |
+          python -m compileall -q \
+            standalone/vision_feedback \
+            docker/vision_detection_jetson
+
+      - name: Shell syntax
+        run: |
+          find . \
+            -type f \
+            -name '*.sh' \
+            -not -path './.git/*' \
+            -print0 | \
+          xargs -0 -r -n1 bash -n
+
+      - name: XML syntax
+        run: |
+          python - <<'PYXML'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          for path in Path('.').rglob('*.xml'):
+              if '.git' in path.parts:
+                  continue
+              ET.parse(path)
+              print(f'OK: {path}')
+          PYXML
+
+      - name: Release tree
+        run: bash scripts/check_release_tree.sh

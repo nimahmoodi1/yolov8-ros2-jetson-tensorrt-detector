@@ -30,7 +30,6 @@ The detector is built around YOLOv8 and is optimized for NVIDIA Jetson Orin NX 1
 15. [Verification](#verification)
 16. [Tests](#tests)
 17. [Troubleshooting](#troubleshooting)
-18. [Publishing checklist](#publishing-checklist)
 
 ---
 
@@ -39,7 +38,18 @@ The detector is built around YOLOv8 and is optimized for NVIDIA Jetson Orin NX 1
 ```text
 yolov8-ros2-jetson-tensorrt-detector/
 ├── README.md
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── SECURITY.md
+├── CITATION.cff
+├── LICENSE.md
+├── LICENSES/
 ├── .gitignore
+├── .github/
+├── docs/
+│   ├── RUNBOOK.md
+│   ├── OPTIMIZATION_REPORT.md
+│   └── RELEASING.md
 ├── standalone/
 │   └── vision_feedback/
 │       ├── CMakeLists.txt
@@ -952,34 +962,16 @@ The class router only accepts model class names containing `head` and/or `body`.
 
 ---
 
-# Publishing checklist
+## Additional documentation
 
-Before making this repository public:
+The root README is the authoritative guide for repository layout, installation,
+deployment choices, and the differences between the Docker and standalone
+variants.
 
-- [ ] Replace/verify maintainer metadata in both ROS packages.
-- [ ] Decide the repository license and add the actual license text at repository root. The current package metadata declares BSD-3-Clause for `vision_feedback` and Apache-2.0 for `ros2_interface`; make the public licensing strategy explicit.
-- [ ] Confirm you have permission to redistribute `models/best_fake_tower_behshahr.pt` and document the dataset/model license or provenance.
-- [ ] Keep `.env` out of Git; publish `.env.example` only.
-- [ ] Do not commit TensorRT `.engine`, generated ONNX, build/install/log folders, or local cache data.
-- [ ] Replace old ZIP/archive references in release documentation if filenames change again.
-- [ ] Verify the actual camera resolution and update `expected_frame_width` / `expected_frame_height` for the intended deployment.
-- [ ] Verify Docker and standalone consumers use the intended message type.
-- [ ] Build on the target Jetson and run the unit tests before tagging a release.
+More detailed documentation is available in:
 
----
-
-## Additional detailed documentation
-
-Deployment-specific documentation is retained inside each snapshot:
-
-```text
-standalone/vision_feedback/README.md
-standalone/vision_feedback/RUNBOOK.md
-standalone/vision_feedback/OPTIMIZATION_REPORT.md
-
-docker/vision_detection_jetson/README.md
-docker/vision_detection_jetson/RUNBOOK.md
-docker/vision_detection_jetson/OPTIMIZATION_REPORT.md
-```
-
-The root README is the authoritative guide for repository layout and the differences between the two deployment variants.
+- `docs/RUNBOOK.md` — complete step-by-step deployment and verification guide.
+- `docs/OPTIMIZATION_REPORT.md` — TensorRT/Jetson optimization history and technical analysis.
+- `docs/RELEASING.md` — maintainer checklist for versioned public releases.
+- `standalone/vision_feedback/README.md` — standalone ROS 2 package details.
+- `docker/vision_detection_jetson/README.md` — Docker/Jetson deployment details.

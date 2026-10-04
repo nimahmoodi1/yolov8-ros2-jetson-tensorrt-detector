@@ -1,0 +1,60 @@
+name: Bug report
+description: Report a reproducible ROS 2, Jetson, TensorRT, detection, or Docker problem
+title: "[Bug]: "
+labels:
+  - bug
+
+body:
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment
+      options:
+        - Standalone ROS 2
+        - Docker
+        - Both
+    validations:
+      required: true
+
+  - type: input
+    id: jetpack
+    attributes:
+      label: JetPack / L4T version
+      placeholder: "Example: JetPack 6.0 / L4T R36.3"
+
+  - type: input
+    id: ros
+    attributes:
+      label: ROS 2 version
+      placeholder: "ROS 2 Humble"
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe what happened and what you expected.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I removed passwords, tokens, private keys, and unrelated identifiers.
+          required: true
+        - label: I checked the README and RUNBOOK first.
+          required: true

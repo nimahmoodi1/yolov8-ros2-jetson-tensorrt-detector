@@ -4,7 +4,7 @@ Jetson-native ROS 2 Humble tower head/body detector for the Orin NX 16 GB.
 Runs **YOLOv8n through a cached TensorRT FP16 engine** with GPU preprocessing
 and GPU NMS, and falls back to PyTorch only if TensorRT is unavailable.
 
-See [`OPTIMIZATION_REPORT.md`](OPTIMIZATION_REPORT.md) for what changed versus
+See [`OPTIMIZATION_REPORT.md`](../../docs/OPTIMIZATION_REPORT.md) for what changed versus
 the previous PyTorch-only version and why.
 
 ---
@@ -40,7 +40,7 @@ make logs
 ```
 
 Step-by-step commands with the exact output to expect are in
-[`RUNBOOK.md`](RUNBOOK.md).
+[`RUNBOOK.md`](../../docs/RUNBOOK.md).
 
 ---
 
@@ -184,7 +184,7 @@ the letterbox adapts per frame. The engine shape only affects efficiency.
 To switch camera, set the two `expected_frame_*` lines in `vision.yaml` (or let
 `mission.yaml` do it) and rebuild the engine. Both engines can live in the
 cache at once; the filename encodes the shape. Full walkthrough: **Part C** of
-[`RUNBOOK.md`](RUNBOOK.md).
+[`RUNBOOK.md`](../../docs/RUNBOOK.md).
 
 On a 1024-wide camera also set `display_width: 640` — the default 960 is a
 0.94x "resize" that the renderer skips, so you gain nothing from it.

@@ -28,7 +28,7 @@ net.core.rmem_max = 16777216
 net.core.wmem_max = 16777216
 NV Power Mode: MAXN
 0
-:10
+<your-display>
 ```
 
 **The power mode matters.** An Orin in a 10 W or 15 W profile runs the GPU at a
@@ -41,19 +41,20 @@ sudo nvpmodel -m 0        # MAXN
 sudo jetson_clocks        # pin clocks to maximum
 ```
 
-`:10` is your xrdp session. If you get something else (`:0`, `:1`), use that
-value in step A1.
+`The display value is environment-specific. A local desktop commonly uses
+`:0`, while an xrdp session may use values such as `:10`. Always use the value
+reported by `echo $DISPLAY` when enabling display support.
 
 Without the two `sysctl` lines Fast DDS silently clamps its socket buffers and
 `ros2 topic hz` on the camera shows a few Hz instead of 15.
 
 ---
 
-## A1. Unpack and configure
+## A1. Clone and configure
 
 ```bash
-unzip vision_detection_container_jetson_v3_fixed_ros2_interface.zip
-cd vision_detection_jetson
+git clone https://github.com/nimahmoodi1/yolov8-ros2-jetson-tensorrt-detector.git
+cd yolov8-ros2-jetson-tensorrt-detector/docker/vision_detection_jetson
 make env
 ```
 
@@ -75,7 +76,7 @@ RAW_BBOX_TOPIC=/art/bounding_boxes_raw
 SHOW_DISPLAY=true
 AUTOSTART=1
 PREBUILD_ENGINE=1
-DISPLAY=:10
+DISPLAY=<your-display>
 XAUTHORITY=/tmp/.docker.xauth
 OMP_NUM_THREADS=1
 OPENBLAS_NUM_THREADS=1
@@ -111,20 +112,27 @@ make build
 Expected, ending with:
 
 ```text
- => [ 6/11] RUN python3 -c "import tensorrt; print('TensorRT bindings OK:', tensorrt.__version__)"
-#0 1.234 TensorRT bindings OK: 8.6.2
- => [10/11] RUN source /opt/ros/humble/setup.bash     && colcon build ...
-#0 45.6 Starting >>> vision_feedback
-#0 78.9 Finished <<< vision_feedback [33.1s]
-#0 79.0 Summary: 1 package finished [33.4s]
+ => RUN python3 -c "import importlib.util; ... find_spec('tensorrt') ..."
+#0 ... TensorRT Python package present: /usr/lib/python3.10/dist-packages/tensorrt/__init__.py
+ => RUN source /opt/ros/humble/setup.bash     && colcon build ...
+#0 ... Starting >>> vision_feedback
+#0 ... Finished <<< vision_feedback [...]
+#0 ... Summary: 1 package finished [...]
  => exporting to image
  => => naming to docker.io/library/vision_detection_jetson:latest
 ```
 
 First build is 15-30 minutes (the torch wheels are large).
 
-> **If it stops at the TensorRT line** with `ModuleNotFoundError: No module
-> named 'tensorrt'`, you are not building on the JetPack base image. Check
+> **Why the build does not run `import tensorrt`:** on Jetson, low-level
+> libraries such as `libnvdla_compiler.so` are supplied to the running
+> container by the NVIDIA container runtime. They are not necessarily present
+> inside a Dockerfile `RUN` layer, so importing TensorRT during `docker build`
+> can fail with `ImportError: libnvdla_compiler.so: cannot open shared object
+> file` even on a correctly configured Jetson. The build only verifies that the
+> TensorRT Python package exists. The real TensorRT/CUDA import is performed at
+> container startup and by `make gpu-check`, when `runtime: nvidia` is active.
+> If the build instead reports `TensorRT Python package missing`, check
 > `BASE_IMAGE` in `.env`/`compose.yaml`.
 
 ---
@@ -140,7 +148,7 @@ make up
 Expected:
 
 ```text
-X cookie ready at /tmp/.docker.xauth for DISPLAY=:10
+X cookie ready at /tmp/.docker.xauth for DISPLAY=<your-display>
 [+] Running 1/1
  ✔ Container vision_detection_jetson  Started
 NAME                       IMAGE                            STATUS         PORTS
@@ -163,8 +171,8 @@ Expected on the **first** run — note the one-off engine build:
 [entrypoint] CUDA available: True
 [entrypoint] GPU: Orin
 [entrypoint] TensorRT: 8.6.2
-[entrypoint] SHOW_DISPLAY=true, DISPLAY=:10
-[entrypoint] X server reachable on :10
+[entrypoint] SHOW_DISPLAY=true, DISPLAY=<your-display>
+[entrypoint] X server reachable on <your-display>
 [entrypoint] Ensuring the TensorRT engine cache is populated...
 [build_engine] TensorRT 8.6.2
 [build_engine] GPU: Orin
@@ -187,7 +195,7 @@ then the node itself:
 [vision_node]: Detector ready: tensorrt/fp16 640x384 on cuda:0 (TensorRT 8.6.2, nc=2, io fp32, private stream)
 [vision_node]: Class routing: head classes [1:head-YJtu] | body classes [0:body]
 [vision_node]: Vision tuning: vfov=46.8 deg standoff=7.0 m (live lidar when fresh) merge=1.20 m (~142 px) max_jump=1.00 m conf(head/body)=0.78/0.82 net=640x384 stabilizer alpha=0.60 hold=0.4s | ~8.5 mm/px vertical @720px height
-[vision_node]: Display enabled on DISPLAY=:10 (max 10 fps, 960px wide)
+[vision_node]: Display enabled on DISPLAY=<your-display> (max 10 fps, 960px wide)
 [vision_node]: Live standoff from '/dist_to_struct' (fallback radius=7.0 m)
 [vision_node]: Subscribed to '/camera/out/live_view'; publishing stable boxes on '/art/bounding_boxes' and raw boxes on '/art/bounding_boxes_raw'
 ```
@@ -491,11 +499,12 @@ pip3 install "ultralytics==8.4.72" "onnx==1.16.2" "onnxslim==0.1.34" \
 
 ---
 
-## B1. Drop the package into your workspace
+## B1. Copy the package into your workspace
 
 ```bash
-unzip vision_feedback_ros2_package_v3.zip
-cp -r vision_feedback ~/ardu_ws/src/
+git clone https://github.com/nimahmoodi1/yolov8-ros2-jetson-tensorrt-detector.git
+mkdir -p ~/ardu_ws/src
+cp -a yolov8-ros2-jetson-tensorrt-detector/standalone/vision_feedback ~/ardu_ws/src/
 cd ~/ardu_ws
 ```
 
@@ -565,7 +574,7 @@ Expected (1-4 minutes):
 [build_engine] GPU: Orin
 [build_engine] Network input 640x384 (fp16)
 [build_engine] Building TensorRT engine (fp16); this takes a few minutes and only happens once per model/shape/device.
-[build_engine] Engine written to /home/flyby/.cache/vision_feedback_engines/best_gazebo_new__384x640__fp16__trt862__orin__3f9c1a2b7d.engine in 118 s
+[build_engine] Engine written to /home/<user>/.cache/vision_feedback_engines/best_gazebo_new__384x640__fp16__trt862__orin__3f9c1a2b7d.engine in 118 s
 [build_engine] OK best_gazebo_new.pt -> .../best_gazebo_new__384x640__fp16__trt862__orin__3f9c1a2b7d.engine (9.4 MB, 121 s)
 [build_engine] All engines ready
 ```
@@ -613,7 +622,7 @@ Expected, for a **1024x680** camera (the shape is derived automatically):
 [vision_node-1] [INFO] [vision_node]: CPU thread pools limited to 1 thread(s)
 [vision_node-1] [INFO] [vision_node]: Camera geometry: expecting 1024x680 -> network input 640x448 (inference_input_shape='auto', imgsz=640)
 [vision_node-1] [INFO] [vision_node]: Detector request: backend=tensorrt device=cuda:0 input=640x448 precision=fp16 fp16_io=False conf_floor=0.78 iou=0.50
-[vision_node-1] [INFO] [vision_node]: Using cached TensorRT engine /home/intplatform/.cache/vision_feedback_engines/best_fake_tower_behshahr__448x640__fp16__trt1030__orin__679908eca5.engine
+[vision_node-1] [INFO] [vision_node]: Using cached TensorRT engine /home/<user>/.cache/vision_feedback_engines/best_fake_tower_behshahr__448x640__fp16__trt1030__orin__679908eca5.engine
 [vision_node-1] [INFO] [vision_node]: TensorRT letterbox 1024x680 -> 640x425 padded into 640x448 (gain=0.625)
 [vision_node-1] [INFO] [vision_node]: Detector ready: tensorrt/fp16 640x448 on cuda:0 (TensorRT 10.3.0, nc=2, io fp32, private stream)
 [vision_node-1] [INFO] [vision_node]: Class routing: head classes [1:head-YJtu] | body classes [0:body]
@@ -793,7 +802,7 @@ Expected:
 [build_engine] GPU: Orin
 [build_engine] Camera 1024x680 -> network input 640x448 (fp16, shape='auto', io fp32)
 [build_engine] Building TensorRT engine (requested fp16, fp16 flag applied, io fp32); this takes a few minutes and only happens once per model/shape/device.
-[build_engine] Engine written to /home/intplatform/.cache/vision_feedback_engines/best_fake_tower_behshahr__448x640__fp16__trt1030__orin__679908eca5.engine in 96 s
+[build_engine] Engine written to /home/<user>/.cache/vision_feedback_engines/best_fake_tower_behshahr__448x640__fp16__trt1030__orin__679908eca5.engine in 96 s
 [build_engine] OK best_fake_tower_behshahr.pt -> .../best_fake_tower_behshahr__448x640__fp16__trt1030__orin__679908eca5.engine (8.9 MB, 99 s)
 [build_engine]    built precision=fp16 (fp16 flag True) io=fp32 tensorrt=10.3.0 gpu=orin
 [build_engine]    verify: tensorrt/fp16 640x448 on cuda:0 (TensorRT 10.3.0, nc=2, io fp32, private stream) | mean 5.9 ms | p50 5.7 ms | p95 7.1 ms

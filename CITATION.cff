@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite this repository."
+title: "YOLOv8 ROS 2 Jetson TensorRT Detector"
+type: software
+version: "1.1.0"
+date-released: 2026-10-04
+
+authors:
+  - given-names: "Nima"
+    family-names: "Mahmoudi"
+
+abstract: >-
+  A ROS 2 Humble computer-vision detector optimized for NVIDIA Jetson,
+  using YOLOv8 with TensorRT FP16/CUDA acceleration and supporting standalone
+  and Docker deployments for real-time power-line tower head and body
+  detection.
+
+keywords:
+  - ROS 2
+  - YOLOv8
+  - NVIDIA Jetson
+  - TensorRT
+  - CUDA
+  - object detection
+  - computer vision
+  - tower inspection
+
+repository-code: "https://github.com/nimahmoodi1/yolov8-ros2-jetson-tensorrt-detector"
